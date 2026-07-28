@@ -1,37 +1,38 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <RootNamespace>CRUD</RootNamespace>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
-    <Authors>ThrashingLaggard</Authors>
-    <Description>CRUD + Pageineering + x</Description>
-    <TargetFramework>net8.0</TargetFramework>
-    <NuGetAuditMode>all</NuGetAuditMode>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <AssemblyName>ExtendedCRUD</AssemblyName>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
-	  <PackageTags>crud, pageineering, efcore, wrapper,</PackageTags>
-    <Company>$(Authors) Industries</Company>
-    <Title>CRUD+</Title>
-  </PropertyGroup>
+	<PropertyGroup>
+		<RootNamespace>CRUD</RootNamespace>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<Authors>ThrashingLaggard</Authors>
+		<Description>CRUD + Pageineering + x</Description>
+		<TargetFramework>net8.0</TargetFramework>
+		<NuGetAuditMode>all</NuGetAuditMode>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<AssemblyName>ExtendedCRUD</AssemblyName>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+		<PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+		<PackageTags>crud, pageineering, efcore, wrapper,</PackageTags>
+		<RepositoryUrl>https://github.com/ThrashingLaggard/ExtendedCRUD</RepositoryUrl>
+		<Company>$(Authors) Industries</Company>
+		<Title>CRUD+</Title>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <None Include="..\README.md">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-  </ItemGroup>
+	<ItemGroup>
+		<None Include="..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
 
-  <ItemGroup>
-    <!-- No ASP.NET Core dependency here on purpose: CrudControllerAPI<T> and its REST
+	<ItemGroup>
+		<!-- No ASP.NET Core dependency here on purpose: CrudControllerAPI<T> and its REST
          surface moved to the separate CRUD+.AspNetCore project, so this core library stays
          a plain EF Core repository package, usable from any .NET 8 project. -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.23" />
-    <PackageReference Include="xyToolz" Version="1.3.2" />
-  </ItemGroup>
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.23" />
+		<PackageReference Include="xyToolz" Version="1.3.2" />
+	</ItemGroup>
 
 </Project>
