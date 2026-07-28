@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>CRUD</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <Authors>ThrashingLaggard</Authors>
+    <Description>Optional ASP.NET Core REST surface (CrudControllerAPI&lt;T&gt;) for CRUD+. Separate package so the core CRUD+ library stays free of any ASP.NET Core dependency.</Description>
+    <TargetFramework>net8.0</TargetFramework>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <AssemblyName>ExtendedCRUD.AspNetCore</AssemblyName>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Title>ExtendedCRUD API </Title>
+    <Company>$(Authors) Industries</Company>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+	This is the API extension for my ExtendedCRUD library.
+	I sourced it out, because this project (unlike CRUD+ itself)  needs ASP.NET Core types (ControllerBase, [Authorize], IAuthorizationHandler, ...). 
+    -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CRUD+\CRUD+.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>
