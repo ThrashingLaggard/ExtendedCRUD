@@ -27,8 +27,29 @@ namespace CRUD.Repos
     /// constructs, disposes, or replaces it, and nothing opens or commits a transaction.
     /// </remarks>
     /// <typeparam name="T">The entity type this repository operates on.</typeparam>
-    public partial class CrudRepository<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T> where T : class
+    public partial class CrudRepository<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T>, ICrudSoftDelete<T> where T : class
     {
+        /// <summary>
+        /// How this repository closes a row when soft-deleting, or <see langword="null"/> when
+        /// no marker was configured. See <see cref="CrudSoftDeleteOptions{T}"/>.
+        /// </summary>
+        private readonly CrudSoftDeleteOptions<T>? _softDeleteOptions;
+
+        /// <summary>
+        /// Creates a repository that can also soft-delete <typeparamref name="T"/> by stamping a
+        /// configured marker property.
+        /// </summary>
+        /// <remarks>
+        /// A separate constructor rather than an optional parameter on the primary one, so
+        /// existing compiled consumers keep binding to the single-argument signature.
+        /// </remarks>
+        /// <param name="context">The caller-owned context, which this repository never owns.</param>
+        /// <param name="softDeleteOptions">How to mark a row of <typeparamref name="T"/> as closed.</param>
+        public CrudRepository(DbContext context, CrudSoftDeleteOptions<T>? softDeleteOptions) : this(context)
+        {
+            _softDeleteOptions = softDeleteOptions;
+        }
+
         #region "Queryable access"
 
         /// <inheritdoc />
@@ -235,6 +256,107 @@ namespace CRUD.Repos
         {
             await RemoveRangeNoSaveAsync(entities, cancellationToken);
             return await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        #endregion
+        #region "Soft delete"
+
+        /// <inheritdoc />
+        public bool IsSoftDeleteConfigured => _softDeleteOptions is not null;
+
+        /// <inheritdoc />
+        public async Task<int> SoftDeleteAsync(T entity, CancellationToken cancellationToken = default)
+        {
+            StageMarker(entity, closed: true);
+            return await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task SoftDeleteNoSaveAsync(T entity, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            StageMarker(entity, closed: true);
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public Task SoftDeleteRangeNoSaveAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(entities);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            foreach (T entity in entities)
+            {
+                StageMarker(entity, closed: true);
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public async Task<int> RestoreAsync(T entity, CancellationToken cancellationToken = default)
+        {
+            StageMarker(entity, closed: false);
+            return await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Writes the configured soft-delete marker onto <paramref name="entity"/> and marks
+        /// <em>only</em> that property as modified.
+        /// </summary>
+        /// <remarks>
+        /// Marking a single property, rather than calling <c>Update</c>, is the whole point: the
+        /// resulting statement is <c>UPDATE … SET &lt;marker&gt; = … WHERE &lt;key&gt; = …</c>
+        /// and touches nothing else. A whole-entity update would rewrite every column, which
+        /// can overwrite a concurrent change to an unrelated field and makes the statement
+        /// larger than the schema's <c>AFTER UPDATE OF &lt;marker&gt;</c> triggers need it to be.
+        /// </remarks>
+        /// <param name="entity">The entity whose marker to write.</param>
+        /// <param name="closed"><see langword="true"/> to close the row, <see langword="false"/> to reopen it.</param>
+        /// <exception cref="CrudConfigurationException">
+        /// No soft-delete marker was configured, or the configured property is not mapped.
+        /// </exception>
+        private void StageMarker(T entity, bool closed)
+        {
+            ArgumentNullException.ThrowIfNull(entity);
+
+            if (_softDeleteOptions is null)
+            {
+                throw new CrudConfigurationException(
+                    $"No soft-delete marker is configured for '{typeof(T).Name}'. Construct the repository with a " +
+                    $"{nameof(CrudSoftDeleteOptions<T>)}<{typeof(T).Name}> (for example " +
+                    $"{nameof(CrudSoftDeleteOptions<T>)}<{typeof(T).Name}>.{nameof(CrudSoftDeleteOptions<T>.ClosedByTimestamp)}(e => e.ValidTo)), " +
+                    "or use HardDeleteAsync if removing the row is what you meant.");
+            }
+
+            // Attach first when detached, so a caller can close a row it read with no-tracking
+            // without having to reload it as tracked.
+            EntityEntry<T> entry = _context.Entry(entity);
+            if (entry.State == EntityState.Detached)
+            {
+                _context.Attach(entity);
+                entry = _context.Entry(entity);
+            }
+
+            PropertyEntry marker;
+            try
+            {
+                marker = entry.Property(_softDeleteOptions.MarkerPropertyName);
+            }
+            catch (InvalidOperationException ex)
+            {
+                throw new CrudConfigurationException(
+                    $"The configured soft-delete marker '{typeof(T).Name}.{_softDeleteOptions.MarkerPropertyName}' is not a mapped " +
+                    "property of the entity type in this DbContext's model.", ex);
+            }
+
+            marker.CurrentValue = closed ? _softDeleteOptions.CreateClosedValue() : _softDeleteOptions.CreateOpenValue();
+
+            // Only meaningful for an entity that is already Unchanged/Modified. An Added entity
+            // has no row to update yet, and forcing IsModified on it would throw.
+            if (entry.State is EntityState.Unchanged or EntityState.Modified)
+            {
+                marker.IsModified = true;
+            }
         }
 
         #endregion

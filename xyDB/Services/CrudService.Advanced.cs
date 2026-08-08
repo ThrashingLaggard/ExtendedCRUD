@@ -21,7 +21,7 @@ namespace CRUD.Services
     /// caller unchanged. The seam stays available for consumers that want to add validation,
     /// caching or events without touching the repository.
     /// </remarks>
-    public partial class CrudService<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T> where T : class
+    public partial class CrudService<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T>, ICrudSoftDelete<T> where T : class
     {
         #region "Queryable access"
 
@@ -109,6 +109,28 @@ namespace CRUD.Services
         /// <inheritdoc />
         public Task<int> HardDeleteRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default) =>
             _crudRepository.HardDeleteRangeAsync(entities, cancellationToken);
+
+        #endregion
+        #region "Soft delete"
+
+        /// <inheritdoc />
+        public bool IsSoftDeleteConfigured => _crudRepository.IsSoftDeleteConfigured;
+
+        /// <inheritdoc />
+        public Task<int> SoftDeleteAsync(T entity, CancellationToken cancellationToken = default) =>
+            _crudRepository.SoftDeleteAsync(entity, cancellationToken);
+
+        /// <inheritdoc />
+        public Task SoftDeleteNoSaveAsync(T entity, CancellationToken cancellationToken = default) =>
+            _crudRepository.SoftDeleteNoSaveAsync(entity, cancellationToken);
+
+        /// <inheritdoc />
+        public Task SoftDeleteRangeNoSaveAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default) =>
+            _crudRepository.SoftDeleteRangeNoSaveAsync(entities, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<int> RestoreAsync(T entity, CancellationToken cancellationToken = default) =>
+            _crudRepository.RestoreAsync(entity, cancellationToken);
 
         #endregion
     }
