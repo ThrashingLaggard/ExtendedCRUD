@@ -21,7 +21,7 @@ namespace CRUD.Services
     /// caller unchanged. The seam stays available for consumers that want to add validation,
     /// caching or events without touching the repository.
     /// </remarks>
-    public partial class CrudService<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T>, ICrudSoftDelete<T> where T : class
+    public partial class CrudService<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T>, ICrudSoftDelete<T>, ICrudSetOperations<T> where T : class
     {
         #region "Queryable access"
 
@@ -109,6 +109,24 @@ namespace CRUD.Services
         /// <inheritdoc />
         public Task<int> HardDeleteRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default) =>
             _crudRepository.HardDeleteRangeAsync(entities, cancellationToken);
+
+        #endregion
+        #region "Set-based operations"
+
+        /// <inheritdoc />
+        public Task<int> ExecuteUpdateAsync(
+            Expression<Func<T, bool>> predicate,
+#if NET10_0_OR_GREATER
+            Action<UpdateSettersBuilder<T>> setters,
+#else
+            Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> setters,
+#endif
+            CancellationToken cancellationToken = default) =>
+            _crudRepository.ExecuteUpdateAsync(predicate, setters, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default) =>
+            _crudRepository.ExecuteDeleteAsync(predicate, cancellationToken);
 
         #endregion
         #region "Soft delete"

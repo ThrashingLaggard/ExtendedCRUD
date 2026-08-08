@@ -38,6 +38,7 @@ namespace xyDB.Tests
 
         private static CrudSoftDeleteOptions<NodeEntity> ValidToMarker() =>
             CrudSoftDeleteOptions<NodeEntity>.ClosedByTimestamp(n => n.ValidTo);
+
         [Fact]
         public async Task SoftDeleteAsync_StampsTheConfiguredMarker_WithoutRemovingTheRow()
         {
@@ -222,6 +223,84 @@ namespace xyDB.Tests
                 .ToListAsync();
 
             Assert.Equal(["3.md", "4.md", "5.md"], paths);
+        }
+
+        [Fact]
+        public async Task ExecuteUpdateAsync_UpdatesEveryMatchingRowInOneStatement()
+        {
+            await using AdvancedTestDbContext context = CreateContext();
+            context.Nodes.AddRange(
+                new NodeEntity { NodeId = 1, Id = "dup", Path = "a.md" },
+                new NodeEntity { NodeId = 2, Id = "dup", Path = "b.md" },
+                new NodeEntity { NodeId = 3, Id = "unique", Path = "c.md" });
+            await context.SaveChangesAsync();
+            context.ChangeTracker.Clear();
+
+            var repo = new CrudRepository<NodeEntity>(context);
+
+            int flagged = await repo.ExecuteUpdateAsync(
+                n => n.Id == "dup",
+                setters => setters.SetProperty(n => n.ParseError, "duplicate_id"));
+
+            Assert.Equal(2, flagged);
+            Assert.Equal(2, await repo.Query().CountAsync(n => n.ParseError == "duplicate_id"));
+        }
+
+        [Fact]
+        public async Task ExecuteUpdateAsync_CanClearAFlag_MakingThePassIdempotent()
+        {
+            await using AdvancedTestDbContext context = CreateContext();
+            context.Nodes.Add(new NodeEntity { NodeId = 1, Id = "was-dup", Path = "a.md", ParseError = "duplicate_id" });
+            await context.SaveChangesAsync();
+            context.ChangeTracker.Clear();
+
+            var repo = new CrudRepository<NodeEntity>(context);
+
+            int cleared = await repo.ExecuteUpdateAsync(
+                n => n.ParseError == "duplicate_id",
+                setters => setters.SetProperty(n => n.ParseError, (string?)null));
+
+            Assert.Equal(1, cleared);
+            Assert.Null((await repo.ReadByKeyAsync(1))!.ParseError);
+        }
+
+        [Fact]
+        public async Task ExecuteDeleteAsync_DeletesEveryMatchingRowInOneStatement()
+        {
+            await using AdvancedTestDbContext context = CreateContext();
+            context.Tags.AddRange(
+                new TagEntity { TagId = Guid.NewGuid(), NodeId = 1, Label = "a" },
+                new TagEntity { TagId = Guid.NewGuid(), NodeId = 1, Label = "b" },
+                new TagEntity { TagId = Guid.NewGuid(), NodeId = 2, Label = "c" });
+            await context.SaveChangesAsync();
+            context.ChangeTracker.Clear();
+
+            var repo = new CrudRepository<TagEntity>(context);
+
+            int removed = await repo.ExecuteDeleteAsync(t => t.NodeId == 1);
+
+            Assert.Equal(2, removed);
+            Assert.Equal(1, await repo.Query().CountAsync());
+        }
+
+        [Fact]
+        public async Task SetBasedOperations_EnlistInTheCallersTransaction()
+        {
+            await using AdvancedTestDbContext context = CreateContext();
+            context.Nodes.Add(new NodeEntity { NodeId = 1, Id = "dup", Path = "a.md" });
+            await context.SaveChangesAsync();
+            context.ChangeTracker.Clear();
+
+            var repo = new CrudRepository<NodeEntity>(context);
+
+            await using (var transaction = await context.Database.BeginTransactionAsync())
+            {
+                await repo.ExecuteUpdateAsync(n => n.Id == "dup", s => s.SetProperty(n => n.ParseError, "duplicate_id"));
+                await transaction.RollbackAsync();
+            }
+
+            await using AdvancedTestDbContext observer = CreateContext();
+            Assert.Null((await observer.Nodes.SingleAsync()).ParseError);
         }
     }
 }

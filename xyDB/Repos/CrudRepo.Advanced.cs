@@ -27,7 +27,7 @@ namespace CRUD.Repos
     /// constructs, disposes, or replaces it, and nothing opens or commits a transaction.
     /// </remarks>
     /// <typeparam name="T">The entity type this repository operates on.</typeparam>
-    public partial class CrudRepository<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T>, ICrudSoftDelete<T> where T : class
+    public partial class CrudRepository<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T>, ICrudSoftDelete<T>, ICrudSetOperations<T> where T : class
     {
         /// <summary>
         /// How this repository closes a row when soft-deleting, or <see langword="null"/> when
@@ -256,6 +256,36 @@ namespace CRUD.Repos
         {
             await RemoveRangeNoSaveAsync(entities, cancellationToken);
             return await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        #endregion
+        #region "Set-based operations"
+
+        /// <inheritdoc />
+        public Task<int> ExecuteUpdateAsync(
+            Expression<Func<T, bool>> predicate,
+#if NET10_0_OR_GREATER
+            Action<UpdateSettersBuilder<T>> setters,
+#else
+            Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> setters,
+#endif
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+            ArgumentNullException.ThrowIfNull(setters);
+
+            // No AsNoTracking(): these statements never materialize entities, so asking for
+            // no-tracking on top would be noise. Global query filters still apply, so a
+            // set-based update cannot silently reach rows a normal read would not see.
+            return _context.Set<T>().Where(predicate).ExecuteUpdateAsync(setters, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+
+            return _context.Set<T>().Where(predicate).ExecuteDeleteAsync(cancellationToken);
         }
 
         #endregion
