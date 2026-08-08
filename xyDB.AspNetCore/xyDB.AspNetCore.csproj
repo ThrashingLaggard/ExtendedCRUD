@@ -6,13 +6,16 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <Authors>ThrashingLaggard</Authors>
-    <Description>Optional ASP.NET Core REST surface (CrudControllerAPI&lt;T&gt;) for CRUD+. Separate package so the core CRUD+ library stays free of any ASP.NET Core dependency.</Description>
-    <TargetFramework>net8.0</TargetFramework>
+    <Description>Optional ASP.NET Core REST surface (CrudControllerAPI&lt;T&gt;) for ExtendedCRUD. Separate package so the core ExtendedCRUD library stays free of any ASP.NET Core dependency.</Description>
+    <!-- Follows the core xyDB package's multi-targeting; FrameworkReference resolves the
+         matching ASP.NET Core shared framework per TFM automatically. -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <NuGetAuditMode>all</NuGetAuditMode>
     <AssemblyName>ExtendedCRUD.AspNetCore</AssemblyName>
+    <PackageId>ExtendedCRUD.AspNetCore</PackageId>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <Title>ExtendedCRUD API </Title>
     <Company>$(Authors) Industries</Company>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -21,7 +24,7 @@
   <ItemGroup>
     <!--
 	This is the API extension for my ExtendedCRUD library.
-	I sourced it out, because this project (unlike CRUD+ itself)  needs ASP.NET Core types (ControllerBase, [Authorize], IAuthorizationHandler, ...). 
+	I sourced it out, because this project (unlike xyDB itself)  needs ASP.NET Core types (ControllerBase, [Authorize], IAuthorizationHandler, ...).
     -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
@@ -31,7 +34,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="README.md">
+    <!-- Include rather than Update: with multi-targeting the outer pack pass has no default
+         None item to update, and NU5039 fails the build when the declared readme is absent. -->
+    <None Include="README.md">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
