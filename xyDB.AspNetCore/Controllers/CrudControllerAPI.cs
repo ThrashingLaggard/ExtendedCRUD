@@ -63,30 +63,36 @@ namespace CRUD.Controllers
         // Injected via primary constructor; resolved per-request by DI (typically Scoped).
         private readonly CrudService<T> _service = crudService;
 
-        // The library's id-based members (Read(int), GetEntryByID(int), Delete-by-id) already
-        // assume entities expose an int primary key conventionally named "Id". Reused here,
-        // via reflection, purely to detect a route/body id mismatch on PUT - if T doesn't
-        // follow the convention, the property lookup below simply comes back null and the
-        // consistency check is skipped rather than failing.
-        private static readonly PropertyInfo? IdProperty = typeof(T).GetProperty("Id");
-
         /// <summary>
-        /// Attempts to read an <c>int</c> "Id" value off <paramref name="entity"/> via the
-        /// convention-based <see cref="IdProperty"/>.
+        /// Attempts to read <paramref name="entity"/>'s primary-key value as an <c>int</c>, to
+        /// detect a route/body id mismatch on PUT.
         /// </summary>
-        private static bool TryGetEntityId(T entity, out int id)
+        /// <remarks>
+        /// <para>
+        /// The key comes from the EF Core model rather than from a property literally named
+        /// <c>Id</c>. That fixes a real gap: an entity whose key is <c>NodeId</c> used to fall
+        /// through the old reflection lookup and skip the consistency check entirely, and an
+        /// entity carrying a non-key property called <c>Id</c> would have had the wrong property
+        /// compared against the route.
+        /// </para>
+        /// <para>
+        /// Returns <see langword="false"/>, skipping the check rather than failing the request,
+        /// whenever the key cannot be compared to an <c>int</c> route value — a composite,
+        /// keyless, shadow, or non-integer key. Those entity types are still perfectly usable
+        /// through this controller; they just do not get this particular guard, since the route
+        /// template itself is typed <c>int</c>.
+        /// </para>
+        /// </remarks>
+        private bool TryGetEntityId(T entity, out int id)
         {
             id = default;
-            if (IdProperty is null || IdProperty.PropertyType != typeof(int))
+            if (!_service.TryGetKeyValue(entity, out object? keyValue) || keyValue is not int value)
             {
                 return false;
             }
-            if (IdProperty.GetValue(entity) is int value)
-            {
-                id = value;
-                return true;
-            }
-            return false;
+
+            id = value;
+            return true;
         }
 
         /// <summary>
@@ -348,7 +354,7 @@ namespace CRUD.Controllers
         /// Updates an existing entity of type <typeparamref name="T"/>.
         /// </summary>
         /// <remarks>Requires the <c>"CrudWrite"</c> authorization policy.</remarks>
-        /// <param name="id">The id of the entity being updated (route parameter; cross-checked against <paramref name="value"/> when <typeparamref name="T"/> exposes a conventional int "Id" property).</param>
+        /// <param name="id">The id of the entity being updated (route parameter; cross-checked against <paramref name="value"/> when <typeparamref name="T"/>'s model-configured primary key is a single int property).</param>
         /// <param name="value">The updated entity data, bound from the request body.</param>
         /// <param name="cancellationToken">Propagated to the underlying EF Core save so the client can abort the request.</param>
         /// <returns>200 OK on success, 400 Bad Request when the body is missing/invalid or its id doesn't match the route, 409 Conflict on a concurrent modification, or 500 (ProblemDetails) if the write fails.</returns>
@@ -371,8 +377,8 @@ namespace CRUD.Controllers
                 }
 
                 // Prevent a route id that silently disagrees with the body's id from updating
-                // the wrong row (or masking a client bug). Skipped for entity types that don't
-                // follow the library's int "Id" convention.
+                // the wrong row (or masking a client bug). Skipped for entity types whose key
+                // cannot be compared to an int route value - see TryGetEntityId.
                 if (TryGetEntityId(value, out int bodyId) && bodyId != id)
                 {
                     return BadRequest($"Route id ({id}) does not match the entity id in the request body ({bodyId}).");

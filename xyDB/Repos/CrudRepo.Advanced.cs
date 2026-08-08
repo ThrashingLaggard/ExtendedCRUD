@@ -27,7 +27,7 @@ namespace CRUD.Repos
     /// constructs, disposes, or replaces it, and nothing opens or commits a transaction.
     /// </remarks>
     /// <typeparam name="T">The entity type this repository operates on.</typeparam>
-    public partial class CrudRepository<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T>, ICrudSoftDelete<T>, ICrudSetOperations<T> where T : class
+    public partial class CrudRepository<T> : IAdvancedCrud<T> where T : class
     {
         /// <summary>
         /// How this repository closes a row when soft-deleting, or <see langword="null"/> when
@@ -71,6 +71,7 @@ namespace CRUD.Repos
         }
 
         #endregion
+
         #region "Key access"
 
         /// <inheritdoc />
@@ -149,6 +150,7 @@ namespace CRUD.Repos
         }
 
         #endregion
+
         #region "Staging (no save)"
 
         /// <inheritdoc />
@@ -214,6 +216,7 @@ namespace CRUD.Repos
             _context.SaveChangesAsync(cancellationToken);
 
         #endregion
+
         #region "Async core operations"
 
         /// <inheritdoc />
@@ -259,6 +262,7 @@ namespace CRUD.Repos
         }
 
         #endregion
+
         #region "Set-based operations"
 
         /// <inheritdoc />
@@ -289,6 +293,7 @@ namespace CRUD.Repos
         }
 
         #endregion
+
         #region "Soft delete"
 
         /// <inheritdoc />

@@ -21,7 +21,7 @@ namespace CRUD.Services
     /// caller unchanged. The seam stays available for consumers that want to add validation,
     /// caching or events without touching the repository.
     /// </remarks>
-    public partial class CrudService<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T>, ICrudSoftDelete<T>, ICrudSetOperations<T> where T : class
+    public partial class CrudService<T> : IAdvancedCrud<T> where T : class
     {
         #region "Queryable access"
 
@@ -30,6 +30,7 @@ namespace CRUD.Services
             _crudRepository.Query(tracked, ignoreQueryFilters);
 
         #endregion
+
         #region "Key access"
 
         /// <inheritdoc />
@@ -53,6 +54,7 @@ namespace CRUD.Services
             _crudRepository.TryGetKeyValue(entity, out keyValue);
 
         #endregion
+
         #region "Staging (no save)"
 
         /// <inheritdoc />
@@ -84,6 +86,7 @@ namespace CRUD.Services
             _crudRepository.SaveChangesAsync(cancellationToken);
 
         #endregion
+
         #region "Async core operations"
 
         /// <inheritdoc />
@@ -111,6 +114,7 @@ namespace CRUD.Services
             _crudRepository.HardDeleteRangeAsync(entities, cancellationToken);
 
         #endregion
+
         #region "Set-based operations"
 
         /// <inheritdoc />
@@ -129,6 +133,7 @@ namespace CRUD.Services
             _crudRepository.ExecuteDeleteAsync(predicate, cancellationToken);
 
         #endregion
+
         #region "Soft delete"
 
         /// <inheritdoc />

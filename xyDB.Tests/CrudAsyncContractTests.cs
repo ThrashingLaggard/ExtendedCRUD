@@ -28,6 +28,7 @@ namespace xyDB.Tests
         public void Dispose() => _connection.Dispose();
 
         private AdvancedTestDbContext CreateContext() => new(_options);
+
         [Fact]
         public async Task CreateAsync_WithNullEntity_Throws_WhereLegacyCreateReturnsFalse()
         {
@@ -116,6 +117,18 @@ namespace xyDB.Tests
 
             Assert.NotNull(asExtended);
             Assert.NotNull(serviceAsExtended);
+        }
+
+        [Fact]
+        public void TheNewSurface_IsReachableThroughIAdvancedCrud()
+        {
+            using AdvancedTestDbContext context = CreateContext();
+
+            IAdvancedCrud<NodeEntity> repo = new CrudRepository<NodeEntity>(context);
+            IAdvancedCrud<NodeEntity> service = new CrudService<NodeEntity>(new CrudRepository<NodeEntity>(context));
+
+            Assert.NotNull(repo.Query());
+            Assert.NotNull(service.Query());
         }
     }
 }
