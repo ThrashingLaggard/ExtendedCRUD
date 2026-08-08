@@ -21,7 +21,7 @@ namespace CRUD.Services
     /// caller unchanged. The seam stays available for consumers that want to add validation,
     /// caching or events without touching the repository.
     /// </remarks>
-    public partial class CrudService<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T> where T : class
+    public partial class CrudService<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T> where T : class
     {
         #region "Queryable access"
 
@@ -51,6 +51,64 @@ namespace CRUD.Services
         /// <inheritdoc />
         public bool TryGetKeyValue(T entity, out object? keyValue) =>
             _crudRepository.TryGetKeyValue(entity, out keyValue);
+
+        #endregion
+        #region "Staging (no save)"
+
+        /// <inheritdoc />
+        public Task AddNoSaveAsync(T entity, CancellationToken cancellationToken = default) =>
+            _crudRepository.AddNoSaveAsync(entity, cancellationToken);
+
+        /// <inheritdoc />
+        public Task AddRangeNoSaveAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default) =>
+            _crudRepository.AddRangeNoSaveAsync(entities, cancellationToken);
+
+        /// <inheritdoc />
+        public Task UpdateNoSaveAsync(T entity, CancellationToken cancellationToken = default) =>
+            _crudRepository.UpdateNoSaveAsync(entity, cancellationToken);
+
+        /// <inheritdoc />
+        public Task UpdateRangeNoSaveAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default) =>
+            _crudRepository.UpdateRangeNoSaveAsync(entities, cancellationToken);
+
+        /// <inheritdoc />
+        public Task RemoveNoSaveAsync(T entity, CancellationToken cancellationToken = default) =>
+            _crudRepository.RemoveNoSaveAsync(entity, cancellationToken);
+
+        /// <inheritdoc />
+        public Task RemoveRangeNoSaveAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default) =>
+            _crudRepository.RemoveRangeNoSaveAsync(entities, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+            _crudRepository.SaveChangesAsync(cancellationToken);
+
+        #endregion
+        #region "Async core operations"
+
+        /// <inheritdoc />
+        public Task<int> CreateAsync(T entity, CancellationToken cancellationToken = default) =>
+            _crudRepository.CreateAsync(entity, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<int> CreateRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default) =>
+            _crudRepository.CreateRangeAsync(entities, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<int> UpdateAsync(T entity, CancellationToken cancellationToken = default) =>
+            _crudRepository.UpdateAsync(entity, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<int> UpdateRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default) =>
+            _crudRepository.UpdateRangeAsync(entities, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<int> HardDeleteAsync(T entity, CancellationToken cancellationToken = default) =>
+            _crudRepository.HardDeleteAsync(entity, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<int> HardDeleteRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default) =>
+            _crudRepository.HardDeleteRangeAsync(entities, cancellationToken);
 
         #endregion
     }

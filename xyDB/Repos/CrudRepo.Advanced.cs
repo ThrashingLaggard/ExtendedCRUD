@@ -27,7 +27,7 @@ namespace CRUD.Repos
     /// constructs, disposes, or replaces it, and nothing opens or commits a transaction.
     /// </remarks>
     /// <typeparam name="T">The entity type this repository operates on.</typeparam>
-    public partial class CrudRepository<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T> where T : class
+    public partial class CrudRepository<T> : ICrudQueryAccess<T>, ICrudKeyAccess<T>, ICrudStaging<T>, ICrudAsync<T> where T : class
     {
         #region "Queryable access"
 
@@ -125,6 +125,116 @@ namespace CRUD.Repos
 
             keyValue = clrProperty.GetValue(entity);
             return true;
+        }
+
+        #endregion
+        #region "Staging (no save)"
+
+        /// <inheritdoc />
+        public async Task AddNoSaveAsync(T entity, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(entity);
+
+            // AddAsync rather than Add: only the async form can run a value generator that
+            // needs to hit the database (HiLo, for instance) before the insert is staged.
+            await _context.AddAsync(entity, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public async Task AddRangeNoSaveAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(entities);
+
+            await _context.AddRangeAsync(entities, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task UpdateNoSaveAsync(T entity, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(entity);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            _context.Update(entity);
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public Task UpdateRangeNoSaveAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(entities);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            _context.UpdateRange(entities);
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public Task RemoveNoSaveAsync(T entity, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(entity);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            _context.Remove(entity);
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public Task RemoveRangeNoSaveAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(entities);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            _context.RemoveRange(entities);
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+            _context.SaveChangesAsync(cancellationToken);
+
+        #endregion
+        #region "Async core operations"
+
+        /// <inheritdoc />
+        public async Task<int> CreateAsync(T entity, CancellationToken cancellationToken = default)
+        {
+            await AddNoSaveAsync(entity, cancellationToken);
+            return await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public async Task<int> CreateRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default)
+        {
+            await AddRangeNoSaveAsync(entities, cancellationToken);
+            return await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public async Task<int> UpdateAsync(T entity, CancellationToken cancellationToken = default)
+        {
+            await UpdateNoSaveAsync(entity, cancellationToken);
+            return await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public async Task<int> UpdateRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default)
+        {
+            await UpdateRangeNoSaveAsync(entities, cancellationToken);
+            return await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public async Task<int> HardDeleteAsync(T entity, CancellationToken cancellationToken = default)
+        {
+            await RemoveNoSaveAsync(entity, cancellationToken);
+            return await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public async Task<int> HardDeleteRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default)
+        {
+            await RemoveRangeNoSaveAsync(entities, cancellationToken);
+            return await _context.SaveChangesAsync(cancellationToken);
         }
 
         #endregion
