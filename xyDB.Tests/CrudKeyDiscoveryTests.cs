@@ -1,3 +1,4 @@
+using CRUD.Exceptions;
 using CRUD.Repos;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,26 @@ namespace xyDB.Tests
         public void Dispose() => _connection.Dispose();
 
         private AdvancedTestDbContext CreateContext() => new(_options);
+
+        [Fact]
+        public async Task ReadByKeyAsync_UsesTheModelsKey_NotAPropertyNamedId()
+        {
+            await using AdvancedTestDbContext context = CreateContext();
+            // Both rows carry the same business Id on purpose: if the repository mistook Id for
+            // the key, this data would be ambiguous and the lookup below could not be correct.
+            context.Nodes.AddRange(
+                new NodeEntity { NodeId = 1, Id = "shared-identifier", Path = "a.md" },
+                new NodeEntity { NodeId = 2, Id = "shared-identifier", Path = "b.md" });
+            await context.SaveChangesAsync();
+
+            var repo = new CrudRepository<NodeEntity>(context);
+
+            NodeEntity? found = await repo.ReadByKeyAsync(2);
+
+            Assert.NotNull(found);
+            Assert.Equal("b.md", found!.Path);
+        }
+
         [Fact]
         public async Task DuplicateBusinessIds_AreASupportedState_NotAKeyCollision()
         {
@@ -92,6 +113,22 @@ namespace xyDB.Tests
         }
 
         [Fact]
+        public async Task ReadByKeyAsync_WithGuidKey_AcceptsGuidAndItsStringForm()
+        {
+            Guid tagId = Guid.NewGuid();
+            await using AdvancedTestDbContext context = CreateContext();
+            context.Tags.Add(new TagEntity { TagId = tagId, NodeId = 1, Label = "alpha" });
+            await context.SaveChangesAsync();
+
+            var repo = new CrudRepository<TagEntity>(context);
+
+            Assert.NotNull(await repo.ReadByKeyAsync(tagId));
+            // A string key value is converted to the key's CLR type rather than rejected,
+            // so an id arriving from a route or a config file does not need pre-parsing.
+            Assert.NotNull(await repo.ReadByKeyAsync(tagId.ToString()));
+        }
+
+        [Fact]
         public void ConstructingARepository_OverACompositeKeyEntity_DoesNotThrow()
         {
             using AdvancedTestDbContext context = CreateContext();
@@ -122,11 +159,37 @@ namespace xyDB.Tests
 
             var repo = new CrudRepository<CompositeKeyEntity>(context);
 
-            // Predicate queries and paging still work; only single-key addressing is not
-            // available for this entity type.
+            // Predicate queries, paging and the queryable hatch all work; only single-key
+            // addressing is unavailable, and that is the only thing that refuses.
             IEnumerable<CompositeKeyEntity> found = await repo.Find(c => c.Note == "pair");
             Assert.Single(found);
             Assert.Single(await repo.Pageineering(1, 10));
+            Assert.Single(await repo.Query().ToListAsync());
+        }
+
+        [Fact]
+        public async Task KeyBasedCall_OnCompositeKeyEntity_ThrowsWithTheSpecificReason()
+        {
+            await using AdvancedTestDbContext context = CreateContext();
+            var repo = new CrudRepository<CompositeKeyEntity>(context);
+
+            CrudKeyException error = await Assert.ThrowsAsync<CrudKeyException>(
+                () => repo.ReadByKeyAsync(1));
+
+            Assert.Equal(CrudKeyProblem.CompositeKey, error.Reason);
+            Assert.Equal(typeof(CompositeKeyEntity), error.EntityType);
+        }
+
+        [Fact]
+        public async Task KeyBasedCall_OnKeylessEntity_ThrowsWithTheSpecificReason()
+        {
+            await using AdvancedTestDbContext context = CreateContext();
+            var repo = new CrudRepository<KeylessEntity>(context);
+
+            CrudKeyException error = await Assert.ThrowsAsync<CrudKeyException>(
+                () => repo.ReadByKeyAsync(1));
+
+            Assert.Equal(CrudKeyProblem.Keyless, error.Reason);
         }
 
         [Fact]
@@ -141,6 +204,40 @@ namespace xyDB.Tests
 
             // No key to order by, so the order is the provider's - but the query still runs.
             Assert.Equal(2, (await repo.Pageineering(1, 10)).Count());
+        }
+
+        [Fact]
+        public void TryGetKeyValue_ReadsTheModelsKey_NotThePropertyNamedId()
+        {
+            using AdvancedTestDbContext context = CreateContext();
+            var repo = new CrudRepository<NodeEntity>(context);
+
+            bool read = repo.TryGetKeyValue(new NodeEntity { NodeId = 42, Id = "not-the-key" }, out object? keyValue);
+
+            Assert.True(read);
+            Assert.Equal(42, keyValue);
+        }
+
+        [Fact]
+        public void TryGetKeyValue_OnCompositeKeyEntity_AnswersNoRatherThanThrowing()
+        {
+            using AdvancedTestDbContext context = CreateContext();
+            var repo = new CrudRepository<CompositeKeyEntity>(context);
+
+            Assert.False(repo.TryGetKeyValue(new CompositeKeyEntity { LeftId = 1, RightId = 2 }, out object? keyValue));
+            Assert.Null(keyValue);
+        }
+
+        [Fact]
+        public void TryGetKeyValue_DoesNotStartTrackingTheInspectedEntity()
+        {
+            using AdvancedTestDbContext context = CreateContext();
+            var repo = new CrudRepository<NodeEntity>(context);
+
+            repo.TryGetKeyValue(new NodeEntity { NodeId = 42 }, out _);
+
+            // Reading a key off a request-body entity must not attach it to the context.
+            Assert.Empty(context.ChangeTracker.Entries<NodeEntity>());
         }
     }
 }
