@@ -1,4 +1,7 @@
+using CRUD.Exceptions;
 using CRUD.Interfaces;
+using CRUD.Internal;
+using CRUD.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Logging;
@@ -18,24 +21,22 @@ namespace CRUD.Repos
     /// <summary>
     /// Generic EF Core backed CRUD repository for any entity type <typeparamref name="T"/>.
     /// </summary>
-    /// <typeparam name="T">The entity type this repository operates on.</typeparam>
-    public class CrudRepository<T>(DbContext context) : IExtendedCrud<T> where T : class
+    public partial class CrudRepository<T>(DbContext context) : IExtendedCrud<T> where T : class
     {
         // Statically typed on purpose: a dynamic DbContext defers member resolution to the DLR,
         // which hides typos/signature mismatches until runtime and disables IntelliSense/analyzers.
         /// <summary>
         /// The EF Core database context used to service all data access for <typeparamref name="T"/>.
         /// </summary>
+        /// <remarks>
+        /// Supplied by the caller and owned by the caller. This repository never creates,
+        /// caches beyond its own lifetime, or disposes a context, and never opens, commits or
+        /// rolls back a transaction — work simply enlists in whatever transaction the supplied
+        /// context already has. Construct one repository per unit of work around a context
+        /// resolved from <c>IDbContextFactory&lt;TContext&gt;</c> or from a scoped registration;
+        /// never register a repository as a singleton, which would capture one context forever.
+        /// </remarks>
         private readonly DbContext _context = context;
-
-        /// <summary>
-        /// The conventional primary-key property name every id-based member of this repository
-        /// (<see cref="Read"/>, <see cref="ExistsAsync"/>, <see cref="ReadIncludingDeleted"/>,
-        /// <see cref="Pageineering"/>'s fallback order, <see cref="Find"/>,
-        /// <see cref="FindByIdsAsync"/>) assumes <typeparamref name="T"/> exposes. Centralized
-        /// here so the convention can't silently drift between call sites.
-        /// </summary>
-        private const string IdPropertyName = "Id";
 
         /// <summary>
         /// Upper bound for <see cref="Pageineering"/>'s <c>pageSize</c> and for <see cref="Find"/>'s
@@ -101,10 +102,26 @@ namespace CRUD.Repos
         /// Get the corresponding instance for the given id
         /// </summary>
         /// <remarks>
-        /// Respects any global query filter configured on <see cref="_context"/> (e.g. a
-        /// soft-delete filter for entities implementing <see cref="ISoftDeletable"/>) — a
-        /// filtered-out entity is reported as "not found", the same as a hard-deleted one.
-        /// Use <see cref="ReadIncludingDeleted"/> to deliberately bypass that filter.
+        /// <para>
+        /// Resolves through <c>DbContext.FindAsync</c>, which has one consequence that must be
+        /// stated rather than discovered: it checks the change tracker before it queries. A
+        /// filtered-out row is reported as "not found" when the lookup reaches the database, but
+        /// an entity the context is <em>already tracking</em> is returned directly, without any
+        /// global query filter being applied to it. For a soft-delete filter that means a row
+        /// closed earlier in the same unit of work can still come back from this method.
+        /// </para>
+        /// <para>
+        /// That behavior is preserved as-is because existing callers rely on it — notably on
+        /// getting back an entity that has been added but not yet saved. Callers for whom a
+        /// closed row must be indistinguishable from an absent one (a lifecycle that creates a
+        /// fresh row when no live one exists, say, where reviving a closed row would be a
+        /// correctness bug) should use
+        /// <see cref="ICrudKeyAccess{T}.ReadByKeyAsync"/>, which always queries the database and
+        /// always applies the model's filters.
+        /// </para>
+        /// <para>
+        /// Use <see cref="ReadIncludingDeleted"/> to bypass the filters deliberately.
+        /// </para>
         /// </remarks>
         /// <param name="id"></param>
         /// <param name="callerName">Captured automatically; name of the calling member.</param>
@@ -412,8 +429,13 @@ namespace CRUD.Repos
 
             try
             {
+                // Key resolved from the model rather than assumed to be a property named "Id":
+                // an entity keyed on NodeId/SectionId/a Guid/a string works here unchanged.
+                Expression<Func<T, bool>> keysMatch =
+                    CrudEntityKey.BuildKeyContainsPredicate<T>(_context, idList.Cast<object>());
+
                 results = await _context.Set<T>()
-                    .Where(e => idList.Contains(EF.Property<int>(e, IdPropertyName)))
+                    .Where(keysMatch)
                     .ToListAsync(cancellationToken);
             }
             catch (Exception ex)
@@ -494,11 +516,14 @@ namespace CRUD.Repos
         /// Checks whether an entity with the given id exists, without materializing it.
         /// </summary>
         /// <remarks>
-        /// Assumes <typeparamref name="T"/> exposes a conventional <c>int</c> "Id" property,
-        /// the same convention already relied on by <see cref="Read"/> and by the optional
-        /// CRUD+.AspNetCore controller's id-matching helper. Uses <c>AsNoTracking()</c> plus
-        /// <c>AnyAsync</c> so no entity instance is ever materialized just to answer a
-        /// yes/no question.
+        /// The key comes from the EF Core model, not from a property named "Id", so this works
+        /// for any single-property primary key whatever it is called and whatever its type —
+        /// <paramref name="id"/> is converted to the key's CLR type. Uses <c>AsNoTracking()</c>
+        /// plus <c>AnyAsync</c> so no entity instance is ever materialized just to answer a
+        /// yes/no question. Entity types with a composite key or no key raise
+        /// <see cref="CrudKeyException"/>, which this method logs and reports as
+        /// <see langword="false"/>; use <see cref="ICrudKeyAccess{T}.ExistsByKeyAsync"/> if the
+        /// distinction between "absent" and "cannot be addressed by key" matters.
         /// </remarks>
         /// <param name="id">The id to check for.</param>
         /// <param name="callerName">Captured automatically; name of the calling member.</param>
@@ -511,7 +536,7 @@ namespace CRUD.Repos
             {
                 exists = await _context.Set<T>()
                     .AsNoTracking()
-                    .AnyAsync(e => EF.Property<int>(e, IdPropertyName) == id, cancellationToken);
+                    .AnyAsync(CrudEntityKey.BuildKeyEqualsPredicate<T>(_context, id), cancellationToken);
             }
             catch (Exception ex)
             {
@@ -542,7 +567,7 @@ namespace CRUD.Repos
             {
                 target = await _context.Set<T>()
                     .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(e => EF.Property<int>(e, IdPropertyName) == id, cancellationToken);
+                    .FirstOrDefaultAsync(CrudEntityKey.BuildKeyEqualsPredicate<T>(_context, id), cancellationToken);
                 if (target is null)
                 {
                     await xyLog.AsxLog(nothingFound);
@@ -562,10 +587,14 @@ namespace CRUD.Repos
         /// <remarks>
         /// <para>
         /// When <paramref name="orderBy"/> is <see langword="null"/>, results are ordered by the
-        /// conventional <c>int</c> "Id" property instead of being left in an undefined order.
-        /// This is a behavior change for existing callers: previously the page order was
-        /// whatever the provider happened to return; now it is always deterministic and stable
-        /// across repeated calls.
+        /// entity's primary key as configured in the EF Core model — every component of it, in
+        /// declaration order, for a composite key — instead of being left in an undefined order,
+        /// so a page is stable across repeated calls.
+        /// </para>
+        /// <para>
+        /// A keyless entity type has nothing to order by and is returned in provider order
+        /// rather than being refused; pass an explicit <paramref name="orderBy"/> when paging
+        /// one of those needs to be deterministic.
         /// </para>
         /// </remarks>
         /// <param name="page"></param>
@@ -613,9 +642,7 @@ namespace CRUD.Repos
                 IQueryable<T> query = _context.Set<T>();
                 query = orderBy is not null
                     ? (descending ? query.OrderByDescending(orderBy) : query.OrderBy(orderBy))
-                    : (descending
-                        ? query.OrderByDescending(e => EF.Property<int>(e, IdPropertyName))
-                        : query.OrderBy(e => EF.Property<int>(e, IdPropertyName)));
+                    : CrudEntityKey.ApplyKeyOrder(query, _context, descending);
 
                 // Fetch the paginated data
                 paginatedList = await query.Skip(skip).Take(pageSize).ToListAsync(cancellationToken);
@@ -640,8 +667,11 @@ namespace CRUD.Repos
         /// <remarks>
         /// <para>
         /// Read with <c>AsNoTracking()</c> and capped/ordered the same way as
-        /// <see cref="Pageineering"/>'s fallback (ordered by "Id", capped at
+        /// <see cref="Pageineering"/>'s fallback (ordered by the model's primary key, capped at
         /// <see cref="MaxPageSize"/>), so a broad predicate can't force an unbounded query.
+        /// The cap is why this returns a materialized list; use
+        /// <see cref="ICrudQueryAccess{T}.Query"/> when the result set should not be capped or
+        /// should be projected before materializing.
         /// </para>
         /// <para>
         /// This overload takes a compiled <see cref="Expression{TDelegate}"/> from trusted,
@@ -662,10 +692,11 @@ namespace CRUD.Repos
 
             try
             {
-                results = await _context.Set<T>()
+                IQueryable<T> query = _context.Set<T>()
                     .AsNoTracking()
-                    .Where(predicate)
-                    .OrderBy(e => EF.Property<int>(e, IdPropertyName))
+                    .Where(predicate);
+
+                results = await CrudEntityKey.ApplyKeyOrder(query, _context)
                     .Take(MaxPageSize)
                     .ToListAsync(cancellationToken);
 

@@ -178,13 +178,19 @@ jobs:
           fi
 
       # ----------------------------------------------------------------------------
-      # B.3) SETUP .NET 8 SDK
-      #   - Ensures we build and test with a known .NET SDK (8.x).
+      # B.3) SETUP .NET SDKs
+      #   - The package multi-targets net8.0;net10.0, so the 10.x SDK is required:
+      #     an 8.x SDK cannot build a net10.0 target group at all. The 10.x SDK builds
+      #     the net8.0 group as well.
+      #   - The 8.x runtime is installed alongside it so the net8.0 test run has a
+      #     runtime to execute on; without it, only the net10.0 tests could run.
       # ----------------------------------------------------------------------------
-      - name: B.3) Setup .NET 8 SDK
+      - name: B.3) Setup .NET SDKs
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       # ----------------------------------------------------------------------------
       # B.4) RESTORE DEPENDENCIES
@@ -192,7 +198,7 @@ jobs:
       # ----------------------------------------------------------------------------
       - name: B.4) Restore dependencies
         id: restore
-        run: dotnet restore CRUD+/CRUD+.csproj
+        run: dotnet restore xyDB/xyDB.csproj
 
       # ----------------------------------------------------------------------------
       # B.5) COMPUTE NEXT SEMVER FROM THE LATEST GIT TAG (PLAN ONLY)
@@ -278,15 +284,18 @@ jobs:
       # ----------------------------------------------------------------------------
       - name: B.6) Build (Release)
         id: build
-        run: dotnet build CRUD+/CRUD+.csproj --configuration Release --no-restore
+        run: dotnet build xyDB/xyDB.csproj --configuration Release --no-restore
 
       # ----------------------------------------------------------------------------
       # B.7) TEST
-      #   - Runs unit tests without rebuilding sources (fast feedback).
+      #   - Runs the suite against every target framework the test project declares,
+      #     so a regression that only shows up on one of them still fails the release.
+      #   - No --no-build here: B.6 builds the library project only, so the test project
+      #     and its own dependencies still have to be restored and built.
       # ----------------------------------------------------------------------------
       - name: B.7) Test
         id: test
-        run: dotnet test CRUD+/CRUD+.csproj --no-build --verbosity detailed
+        run: dotnet test xyDB.Tests/xyDB.Tests.csproj --configuration Release --verbosity normal
 
       # ----------------------------------------------------------------------------
       # B.8) PACK
@@ -297,7 +306,7 @@ jobs:
       # ----------------------------------------------------------------------------
       - name: B.8) Pack (.nupkg to ./out)
         id: pack
-        run: dotnet pack CRUD+/CRUD+.csproj --configuration Release --no-build -o out -p:PackageVersion=${{ env.version }}
+        run: dotnet pack xyDB/xyDB.csproj --configuration Release --no-build -o out -p:PackageVersion=${{ env.version }}
 
       # ----------------------------------------------------------------------------
       # B.9) CHECK IF VERSION EXISTS ON NUGET

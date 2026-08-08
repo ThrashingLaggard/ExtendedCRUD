@@ -2,7 +2,7 @@ using CRUD.Attributes;
 using CRUD.Interfaces;
 using System.ComponentModel.DataAnnotations;
 
-namespace CRUD_.Tests
+namespace xyDB.Tests
 {
     public enum TestStatus
     {

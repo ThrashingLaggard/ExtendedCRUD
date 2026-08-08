@@ -1,0 +1,60 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>CRUD</RootNamespace>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<Authors>ThrashingLaggard</Authors>
+		<Description>CRUD + Pageineering + x</Description>
+		<!-- Multi-targeted so existing net8.0 consumers keep working unchanged while net10.0
+		     consumers get an EF Core group that actually targets their framework. The net8.0
+		     group is the only reason this stays a patch-level, non-breaking release. -->
+		<TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+		<NuGetAuditMode>all</NuGetAuditMode>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<AssemblyName>ExtendedCRUD</AssemblyName>
+		<PackageId>ExtendedCRUD</PackageId>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+		<PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+		<PackageTags>crud, pageineering, efcore, wrapper,</PackageTags>
+		<RepositoryUrl>https://github.com/ThrashingLaggard/ExtendedCRUD</RepositoryUrl>
+		<Company>$(Authors) Industries</Company>
+		<Title>ExtendedCRUD</Title>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- No ASP.NET Core dependency here on purpose: CrudControllerAPI<T> and its REST
+         surface moved to the separate xyDB.AspNetCore project, so this core library stays
+         a plain EF Core repository package, usable from any .NET 8 project. -->
+		<PackageReference Include="xyToolz" Version="1.3.2" />
+	</ItemGroup>
+
+	<!-- EF Core is pinned per target framework rather than once for all of them: a single
+	     8.0.x reference would leave net10.0 consumers on a version that does not actively
+	     target their framework, which is exactly the tension this multi-targeting removes. -->
+	<!--
+	  net8.0 additionally needs Relational: in EF Core 8 the ExecuteUpdate/ExecuteDelete
+	  operators live in RelationalQueryableExtensions, not in the base package. EF Core 10
+	  moved them to EntityFrameworkQueryableExtensions in the base package, so the net10.0
+	  group does not need Relational at all. Relational is the shared foundation of every
+	  relational provider, so referencing it pulls in no specific database.
+	-->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.23" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.23" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+	</ItemGroup>
+
+</Project>

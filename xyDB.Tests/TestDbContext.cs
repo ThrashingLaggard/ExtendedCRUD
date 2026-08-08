@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
-namespace CRUD_.Tests
+namespace xyDB.Tests
 {
     public class TestDbContext(DbContextOptions<TestDbContext> options) : DbContext(options)
     {

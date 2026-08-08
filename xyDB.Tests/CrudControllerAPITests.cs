@@ -5,7 +5,7 @@ using CRUD.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace CRUD_.Tests
+namespace xyDB.Tests
 {
     public class CrudControllerAPITests
     {

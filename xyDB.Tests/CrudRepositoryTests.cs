@@ -2,7 +2,7 @@ using CRUD.Repos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
-namespace CRUD_.Tests
+namespace xyDB.Tests
 {
     /// <summary>Tests targeting <see cref="CrudRepository{T}"/> directly against EF Core InMemory.</summary>
     public class CrudRepositoryTests

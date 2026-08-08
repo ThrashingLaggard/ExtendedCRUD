@@ -24,7 +24,7 @@ namespace CRUD.Services
     /// try/catch around them.
     /// </remarks>
     /// <typeparam name="T"></typeparam>
-    public class CrudService<T>(CrudRepository<T> crudRepository) : IExtendedCrud<T> where T : class
+    public partial class CrudService<T>(CrudRepository<T> crudRepository) : IExtendedCrud<T> where T : class
     {
 
         /// <summary>
