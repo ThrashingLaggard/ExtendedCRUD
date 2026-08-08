@@ -192,7 +192,7 @@ jobs:
       # ----------------------------------------------------------------------------
       - name: B.4) Restore dependencies
         id: restore
-        run: dotnet restore CRUD+/CRUD+.csproj
+        run: dotnet restore xyDB/xyDB.csproj
 
       # ----------------------------------------------------------------------------
       # B.5) COMPUTE NEXT SEMVER FROM THE LATEST GIT TAG (PLAN ONLY)
@@ -278,7 +278,7 @@ jobs:
       # ----------------------------------------------------------------------------
       - name: B.6) Build (Release)
         id: build
-        run: dotnet build CRUD+/CRUD+.csproj --configuration Release --no-restore
+        run: dotnet build xyDB/xyDB.csproj --configuration Release --no-restore
 
       # ----------------------------------------------------------------------------
       # B.7) TEST
@@ -286,7 +286,7 @@ jobs:
       # ----------------------------------------------------------------------------
       - name: B.7) Test
         id: test
-        run: dotnet test CRUD+/CRUD+.csproj --no-build --verbosity detailed
+        run: dotnet test xyDB.Tests/xyDB.Tests.csproj --no-build --verbosity detailed
 
       # ----------------------------------------------------------------------------
       # B.8) PACK
@@ -297,7 +297,7 @@ jobs:
       # ----------------------------------------------------------------------------
       - name: B.8) Pack (.nupkg to ./out)
         id: pack
-        run: dotnet pack CRUD+/CRUD+.csproj --configuration Release --no-build -o out -p:PackageVersion=${{ env.version }}
+        run: dotnet pack xyDB/xyDB.csproj --configuration Release --no-build -o out -p:PackageVersion=${{ env.version }}
 
       # ----------------------------------------------------------------------------
       # B.9) CHECK IF VERSION EXISTS ON NUGET

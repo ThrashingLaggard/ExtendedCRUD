@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <RootNamespace>CRUD_.Tests</RootNamespace>
+    <RootNamespace>xyDB.Tests</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -21,8 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CRUD+\CRUD+.csproj" />
-    <ProjectReference Include="..\CRUD+.AspNetCore\CRUD+.AspNetCore.csproj" />
+    <ProjectReference Include="..\xyDB\xyDB.csproj" />
+    <ProjectReference Include="..\xyDB.AspNetCore\xyDB.AspNetCore.csproj" />
   </ItemGroup>
 
 </Project>

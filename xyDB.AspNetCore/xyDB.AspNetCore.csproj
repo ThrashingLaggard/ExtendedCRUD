@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CRUD+\CRUD+.csproj" />
+    <ProjectReference Include="..\xyDB\xyDB.csproj" />
   </ItemGroup>
 
   <ItemGroup>

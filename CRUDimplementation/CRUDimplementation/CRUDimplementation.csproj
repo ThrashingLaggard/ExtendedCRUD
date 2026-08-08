@@ -11,8 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\CRUD+\CRUD+.csproj" />
-    <ProjectReference Include="..\..\CRUD+.AspNetCore\CRUD+.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\xyDB\xyDB.csproj" />
+    <ProjectReference Include="..\..\xyDB.AspNetCore\xyDB.AspNetCore.csproj" />
   </ItemGroup>
 
 </Project>

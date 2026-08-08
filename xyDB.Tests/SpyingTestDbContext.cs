@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace CRUD_.Tests
+namespace xyDB.Tests
 {
     /// <summary>
     /// Counts calls to <see cref="DbContext.FindAsync{TEntity}(object?[], CancellationToken)"/>
